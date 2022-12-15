@@ -1,0 +1,137 @@
+/*1.Write a query to get Profile ID, Full Name and Contact Number of the tenant who has stayed 
+with us for the longest time period in the past */
+
+select P.profile_id, concat(P.first_name, ' ', P.last_name) as Full_Name , P.phone from profiles P
+       join tenancy_history T on P.profile_id=T.profile_id
+       where DATEDIFF(move_in_date,move_out_date)
+
+
+
+/* 2.Write a query to get the Full name, email id, phone of tenants who are married and paying
+rent > 9000 using subqueries*/
+
+select 
+concat (P.first_name,' ',P.last_name) as FullName,
+P.email_id ,P.phone,P.marital_status, th.rent
+from profiles P
+join tenancy_history th on P.profile_id = th.profile_id
+where th.rent> 9000 and P.marital_status='Y';
+
+
+
+/* 3.Write a query to display profile id, full name, phone, email id, city , house id, move_in_date , 
+move_out date, rent, total number of referrals made, latest employer and the occupational 
+category of all the tenants living in Bangalore or Pune in the time period of jan 2015 to jan 
+2016 sorted by their rent in descending order*/
+
+select P.profile_id, concat (P.first_name,' ',P.last_name) as FullName,
+P.phone, P.email_id, P.city, 
+T.house_id,T.move_in_date,T.move_out_date,
+T.rent,E.latest_employer,E.occupational_category  
+from profiles P
+join tenancy_history T on P.profile_id=T.profile_id
+ join employee_status E on P.profile_id=E.profile_id
+where P.city ='Bangalore' or P.city='Pune'
+and  T.move_in_date=2015-01-01 or T.move_out_date=2016-01-01
+order by T.rent desc
+
+
+
+/*4.Write a sql snippet to find the full_name, email_id, phone number and referral code of all
+the tenants who have referred more than once.
+ Also find the total bonus amount they should receive given that the bonus gets calculated
+only for valid referrals.*/
+
+SELECT P.profile_id
+       , concat (P.first_name,' ',P.last_name) as FullName
+       , P.email_id
+       , P.phone
+       , P.referral_code
+       , R.Total_referrals
+       , R.Total_Bonus_Amount 
+FROM profiles P
+JOIN (SELECT profile_id
+             , SUM(referrer_bonus_amount) AS Total_Bonus_Amount
+             , COUNT(profile_id) AS Total_referrals 
+      FROM referral
+      group by profile_id)R 
+ON P.profile_id=R.profile_id
+where R.Total_referrals>1;
+
+
+
+/* 5. Write a query to find the rent generated from each city and also the total of all cities.*/
+
+select P.profile_id, P.city, T.rent,
+sum(T.rent) over (partition by city ) as rent_from_each_city
+from profiles P 
+join tenancy_history T on P.profile_id = T.profile_id
+order by profile_id
+
+
+
+/* 6. Create a view 'vw_tenant' find 
+profile_id,rent,move_in_date,house_type,beds_vacant,description and city of tenants who 
+shifted on/after 30th april 2015 and are living in houses having vacant beds and its address.*/
+
+create view [vw_tenant] as
+select T.profile_id, T.rent, T.move_in_date, H.house_type, H.beds_vacant,A.description,A.city from
+tenancy_history T inner join houses H on 
+T.house_id = H.house_id 
+inner join addresses A on T.house_id= A.house_id
+where T.move_in_date >2015-04-30
+order by T.profile_id
+
+
+
+/* 7 Write a code to extend the valid_till date for a month of tenants who have referred more 
+than two times*/
+
+SELECT date_add(valid_till,interval 1 month) as extended_date
+FROM   referral
+WHERE  profile_id IN (SELECT   profile_id
+                       FROM     referral
+                       GROUP BY profile_id
+                       HAVING   COUNT(*) > 2)
+
+
+
+/*8. Write a query to get Profile ID, Full Name , Contact Number of the tenants along with a new 
+column 'Customer Segment' wherein if the tenant pays rent greater than 10000, tenant falls 
+in Grade A segment, if rent is between 7500 to 10000, tenant falls in Grade B else in Grade C*/
+
+ select P.profile_id,P.phone,
+concat (P.first_name,' ',P.last_name) as FullName,T.rent,
+case when T.rent>10000 then 'Grade A'
+ when T.rent>7500 and T.rent<10000 then 'Grade B' else 'Grade C' end as customer_segement
+from profiles P join tenancy_history T on P.profile_id=T.profile_id ;
+
+
+
+/* 9. Write a query to get Fullname, Contact, City and House Details of the tenants who have not 
+referred even once*/
+
+SELECT concat (P.first_name,P.last_name) as FullName
+       , P.city
+       , P.phone
+       , P.referral_code
+       , R.Total_referrals
+FROM profiles P
+JOIN (SELECT profile_id
+             , COUNT(profile_id) AS Total_referrals 
+      FROM referral
+      group by profile_id)R 
+ON P.profile_id=R.profile_id
+where R.Total_referrals=1;
+
+
+
+/*10.  Write a query to get the house details of the house having highest occupancy.*/
+
+select A.house_id, A.name , 
+ H.house_type, H.bhk_type, H.furnishing_type, 
+ (H.bed_count - H.beds_vacant) AS Highest_Occupancy
+from Addresses A
+     INNER JOIN Houses H ON 
+         A.house_id= H.house_id 
+ORDER BY Highest_Occupancy DESC
